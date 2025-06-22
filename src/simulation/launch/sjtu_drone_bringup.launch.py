@@ -28,24 +28,24 @@ def get_teleop_controller(context, *_, **kwargs) -> Node:
     controller = context.launch_configurations["controller"]
     namespace = kwargs["model_ns"]
 
-    # if controller == "joystick":
-    #     node = Node(
-    #         package="sjtu_drone_control",
-    #         executable="teleop_joystick",
-    #         namespace=namespace,
-    #         output="screen",
-    #     )
+    if controller == "joystick":
+        node = Node(
+            package="sjtu_drone_control",
+            executable="teleop_joystick",
+            namespace=namespace,
+            output="screen",
+        )
 
-    # else:
-    #     node = Node(
-    #         package="sjtu_drone_control",
-    #         executable="teleop",
-    #         namespace=namespace,
-    #         output="screen",
-    #         prefix="xterm -e",
-    #     )
+    else:
+        node = Node(
+            package="sjtu_drone_control",
+            executable="teleop",
+            namespace=namespace,
+            output="screen",
+            prefix="xterm -e",
+        )
 
-    # return [node]
+    return [node]
 
 def rviz_node_generator(context, rviz_path):
     """Return a Node action for RViz, omitting --fixed-frame if empty."""
@@ -98,10 +98,10 @@ def generate_launch_description():
             description='If provided, sets the fixed frame in RViz.'
         ),
 
-        # OpaqueFunction(
-        #     function=rviz_node_generator,
-        #     kwargs={'rviz_path': rviz_path},
-        # ),
+        OpaqueFunction(
+            function=rviz_node_generator,
+            kwargs={'rviz_path': rviz_path},
+        ),
 
 
         IncludeLaunchDescription(
