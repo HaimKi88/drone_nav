@@ -2,17 +2,24 @@ from setuptools import find_packages, setup
 from glob import glob
 import os
 
-package_name = 'utils'
+package_name = 'simulation'
 
 setup(
     name=package_name,
     version='0.0.0',
     packages=find_packages(exclude=['test']),
+    package_data={
+        'simulation': ['view.qml'],
+    },
+    include_package_data=True,
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*launch.[pxy][yma]*')))
+        (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*launch.[pxy][yma]*'))),
+        (os.path.join('share', package_name, "rviz"), glob('rviz/*.rviz')),
+        (os.path.join('share', package_name, "config"), glob('config/*.yaml')),
+        (os.path.join('share', package_name, "worlds"), glob('worlds/*.sdf')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -23,6 +30,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'gui = simulation.gui:main',
+            'spawn_drone = simulation.spawn_drone:main',
         ],
     },
 )

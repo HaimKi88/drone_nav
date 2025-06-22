@@ -1,0 +1,26 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/haimki/development/ros2_ws/install/simulation/lib/python3.10/site-packages",
+        "/home/haimki/development/ros2_ws/install/navigation/lib/python3.10/site-packages",
+        "/home/haimki/development/drone_ws/build/sjtu_drone_control",
+        "/home/haimki/development/drone_ws/install/sjtu_drone_control/lib/python3.10/site-packages",
+        "/home/haimki/development/drone_ws/build/simulation",
+        "/home/haimki/development/drone_ws/install/simulation/lib/python3.10/site-packages",
+        "/home/haimki/dev/install/turtlesim/local/lib/python3.10/dist-packages",
+        "/home/haimki/dev/install/rrr_ros2/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/haimki/development/ros2_ws/install/simulation/lib/python3.10/site-packages",
+        "/home/haimki/development/ros2_ws/install/navigation/lib/python3.10/site-packages",
+        "/home/haimki/development/drone_ws/build/sjtu_drone_control",
+        "/home/haimki/development/drone_ws/install/sjtu_drone_control/lib/python3.10/site-packages",
+        "/home/haimki/development/drone_ws/build/simulation",
+        "/home/haimki/development/drone_ws/install/simulation/lib/python3.10/site-packages",
+        "/home/haimki/dev/install/turtlesim/local/lib/python3.10/dist-packages",
+        "/home/haimki/dev/install/rrr_ros2/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ]
+}
