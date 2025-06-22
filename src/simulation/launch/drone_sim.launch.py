@@ -26,4 +26,12 @@ def generate_launch_description():
             output='log',
         ),
 
+        Node(
+            package='simulation',
+            executable='target_selection',
+            name='target_selection',
+            output='log',
+        ),
+
+
     ])

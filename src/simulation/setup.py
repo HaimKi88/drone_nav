@@ -30,7 +30,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'gui = simulation.gui:main',
+            'target_selection = simulation.target_selection:main',
             'spawn_drone = simulation.spawn_drone:main',
         ],
     },
