@@ -33,7 +33,6 @@ class Nav(Node):
         self.linear_velocity = 1.5
         self.angular_velocity = 1.0
         self.yaw_p_ctrl = 0.5
-        self.linear_p_ctrl = 1.0
         self.desired_yaw_err = np.deg2rad(1)
         self.desired_linear_err = 0.2
             
@@ -108,7 +107,6 @@ class Nav(Node):
         elif self.state == DroneState.DONE:
             self._run_control_timer.cancel()
 
-
     def transition_to(self, new_state):
         self.get_logger().info(f"→ Transitioning to {new_state.name}")
         self.state = new_state
@@ -140,7 +138,7 @@ class Nav(Node):
 
         if abs(linear_err) > self.desired_linear_err:
             
-            self.cmd_vel.linear.x = np.sign(linear_err)*self.linear_velocity*self.linear_p_ctrl
+            self.cmd_vel.linear.x = np.sign(linear_err)*self.linear_velocity
             self.cmd_vel.angular.z = np.sign(yaw_err)*self.angular_velocity*yaw_err*0.05
 
             self.cmd_vel_publisher.publish(self.cmd_vel)
@@ -156,7 +154,6 @@ class Nav(Node):
         self.get_logger().info("Landing...")
         time.sleep(2)  # Simulate landing
     
-        
         
 def main(args=None):
     rclpy.init(args=args)
