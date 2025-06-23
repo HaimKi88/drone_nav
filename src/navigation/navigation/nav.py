@@ -9,6 +9,7 @@ from enum import Enum, auto
 from tf_transformations import euler_from_quaternion
 import time
 import numpy as np
+from rclpy.time import Time
 
 class DroneState(Enum):
     IDLE = auto()
@@ -19,6 +20,9 @@ class DroneState(Enum):
     DONE = auto()
 
 def geo_to_xy(lat, lon, lat0, lon0):
+    """
+    Converts GPS coordinates to local Cartesian XY using an equirectangular projection.
+    """
     # Earth radius in meters
     R = 6378137.0
 
@@ -41,17 +45,21 @@ class Nav(Node):
     
     def __init__(self):
         super().__init__('nav')
-        self.get_logger().info("nav initiated")
+        self.get_logger().info("nav node initiated")
+        self._init_members()
         self._init_publishers()
         self._init_subscribers()
         
+    def _init_members(self):
         self.state = DroneState.IDLE
         self.cmd_vel = Twist()
         self.linear_velocity = 1.5
         self.angular_velocity = 1.0
         self.yaw_p_ctrl = 0.5
+        self.yaw_d_ctrl = 0.8
+        self.last_yaw_err = 0
         self.desired_yaw_err = np.deg2rad(1)
-        self.desired_linear_err = 0.2
+        self.desired_linear_err = 1.0
             
     def _init_subscribers(self):
         self._coordinates_sub = self.create_subscription(NavSatFix, "/simple_drone/gps/nav", self.get_drone_coordinates, 10)
@@ -72,9 +80,11 @@ class Nav(Node):
         self.coordinates_publisher.publish(drone_coordinates)
     
     def get_drone_odom(self, msg):
+        """Update drone's odometry state."""
         self.odom = msg
         
     def compute_yaw_error(self):
+        """Compute yaw difference between current and target heading."""
         dx = self.x_target - self.odom.pose.pose.position.x
         dy = self.y_target - self.odom.pose.pose.position.y
         yaw = np.arctan2(dy, dx)
@@ -87,12 +97,17 @@ class Nav(Node):
         return heading-yaw
     
     def compute_linear_error(self):
+        """Compute Euclidean distance to the target."""
         dx = self.x_target - self.odom.pose.pose.position.x
         dy = self.y_target - self.odom.pose.pose.position.y
 
         return np.hypot(dx,dy)
 
     def get_target(self, msg):
+        """
+        Receive and set a new target GPS coordinate, convert to XY,
+        and start the control loop.
+        """
         self.get_logger().info(f'got a new target {msg}')
         self.target = msg
         lat0 = 32.072734
@@ -105,12 +120,20 @@ class Nav(Node):
         self._run_control_timer = self.create_timer(1/10.0, self.run_position_control)
 
     def run_position_control(self):
-        self.get_logger().info(
-            f"\n\nposition: [{self.odom.pose.pose.position.x:.2f}, {self.odom.pose.pose.position.y:.2f}, {self.odom.pose.pose.position.z:.2f}]\n"
-            f"target: [{self.x_target:.2f}, {self.y_target:.2f}]\n"
-            f"linear velocity: [{self.odom.twist.twist.linear.x:.2f}, {self.odom.twist.twist.linear.y:.2f}, {self.odom.twist.twist.linear.z:.2f}]\n"
-            f"angular velocity: [{self.odom.twist.twist.angular.x:.2f}, {self.odom.twist.twist.angular.y:.2f}, {self.odom.twist.twist.angular.z:.2f}]")
-
+        """Main state machine loop for drone navigation."""
+        try:
+            pos = self.odom.pose.pose.position
+            twist = self.odom.twist.twist
+            self.get_logger().info(
+                f"\nPosition: [{pos.x:.2f}, {pos.y:.2f}, {pos.z:.2f}]\n"
+                f"Target: [{self.x_target:.2f}, {self.y_target:.2f}]\n"
+                f"Velocity (linear): [{twist.linear.x:.2f}, {twist.linear.y:.2f}, {twist.linear.z:.2f}]\n"
+                f"Velocity (angular): [{twist.angular.x:.2f}, {twist.angular.y:.2f}, {twist.angular.z:.2f}]\n"
+            )
+        except AttributeError:
+            self.get_logger().warn("Odometry data not yet received.")
+            return
+        
         if self.state == DroneState.IDLE:
             self.get_logger().info("STATE IDLE")
             self.transition_to(DroneState.TAKEOFF)
@@ -135,15 +158,18 @@ class Nav(Node):
             self._run_control_timer.destroy()
 
     def transition_to(self, new_state):
+        """Handle state transitions."""
         self.get_logger().info(f"→ Transitioning to {new_state.name}")
         self.state = new_state
 
     def takeoff(self):
+        """Command drone to take off."""
         self.takeoff_publisher.publish(Empty())
         self.get_logger().info("Taking off...")
         time.sleep(2) 
 
     def rotate(self):
+        """Rotate drone to face target heading."""
         self.get_logger().info("Rotating in place...")
         yaw_err = self.compute_yaw_error()
 
@@ -154,31 +180,37 @@ class Nav(Node):
         else:         
             self.cmd_vel.angular.z = 0.0
             self.cmd_vel_publisher.publish(self.cmd_vel)
+            self.past_time = self.get_clock().now().nanoseconds # to use in the next state
             return True
 
     def move_to_position(self):
+        """Move drone to target XY position."""
         self.get_logger().info("Moving to target position...")
-        
         linear_err = self.compute_linear_error()
         yaw_err = self.compute_yaw_error()
+        yaw_differential_control = (yaw_err - self.last_yaw_err)/((self.get_clock().now().nanoseconds - self.past_time)*1e-9) * self.yaw_d_ctrl
 
         if abs(linear_err) > self.desired_linear_err:
             self.cmd_vel.linear.x = np.sign(linear_err)*self.linear_velocity
-            self.cmd_vel.angular.z = np.sign(yaw_err)*self.angular_velocity*yaw_err*0.2
+            self.cmd_vel.angular.z = np.sign(yaw_err)*self.angular_velocity*yaw_differential_control
 
             self.cmd_vel_publisher.publish(self.cmd_vel)
-            self.get_logger().info(f'linear error : {self.compute_linear_error()}')
+            self.get_logger().info(f'linear error : {self.compute_linear_error():.2f}')
+            self.last_yaw_err = yaw_err
+            self.past_time = self.get_clock().now().nanoseconds
+
             return False
         else:         
             self.cmd_vel.linear.x = 0.0
             self.cmd_vel_publisher.publish(self.cmd_vel)
-            self.get_logger().info(f'linear error : {self.compute_linear_error()}')
+            self.get_logger().info(f'linear error : {self.compute_linear_error():.2f}')
             return True
-
+        
     def land(self):
+        """Command drone to land."""
         self.get_logger().info("Landing...")
         self.land_publisher.publish(Empty())
-        time.sleep(2)  # Simulate landing
+        time.sleep(1)  # Simulate landing
     
         
 def main(args=None):
