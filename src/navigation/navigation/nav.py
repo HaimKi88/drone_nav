@@ -5,10 +5,10 @@ from geographic_msgs.msg import GeoPoint
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Empty
 from nav_msgs.msg import Odometry
-import time
 from enum import Enum, auto
-import numpy as np
 from tf_transformations import euler_from_quaternion
+import time
+import numpy as np
 
 class DroneState(Enum):
     IDLE = auto()
@@ -29,8 +29,8 @@ def geo_to_xy(lat, lon, lat0, lon0):
     lon0_rad = np.deg2rad(lon0)
 
     # Equirectangular projection
-    dlat = lat_rad - lat0_rad
-    dlon = lon_rad - lon0_rad
+    dlat = lat0_rad - lat_rad
+    dlon = lon0_rad - lon_rad
 
     x = R * dlon * np.cos(lat0_rad)
     y = R * dlat
@@ -82,7 +82,7 @@ class Nav(Node):
         q_orientation = [self.odom.pose.pose.orientation.x, self.odom.pose.pose.orientation.y, 
                          self.odom.pose.pose.orientation.z, self.odom.pose.pose.orientation.w]
         _, _, heading = euler_from_quaternion(q_orientation)
-        self.get_logger().info(f'heading: {heading}, yaw: {yaw}')
+        # self.get_logger().info(f'heading: {heading}, yaw: {yaw}')
 
         return heading-yaw
     
@@ -106,7 +106,8 @@ class Nav(Node):
 
     def run_position_control(self):
         self.get_logger().info(
-            f"\nposition: [{self.odom.pose.pose.position.x:.2f}, {self.odom.pose.pose.position.y:.2f}, {self.odom.pose.pose.position.z:.2f}]\n"
+            f"\n\nposition: [{self.odom.pose.pose.position.x:.2f}, {self.odom.pose.pose.position.y:.2f}, {self.odom.pose.pose.position.z:.2f}]\n"
+            f"target: [{self.x_target:.2f}, {self.y_target:.2f}]\n"
             f"linear velocity: [{self.odom.twist.twist.linear.x:.2f}, {self.odom.twist.twist.linear.y:.2f}, {self.odom.twist.twist.linear.z:.2f}]\n"
             f"angular velocity: [{self.odom.twist.twist.angular.x:.2f}, {self.odom.twist.twist.angular.y:.2f}, {self.odom.twist.twist.angular.z:.2f}]")
 
@@ -153,7 +154,6 @@ class Nav(Node):
         else:         
             self.cmd_vel.angular.z = 0.0
             self.cmd_vel_publisher.publish(self.cmd_vel)
-            self.get_logger().info(f'yaw error : {self.compute_yaw_error()}')
             return True
 
     def move_to_position(self):
@@ -163,9 +163,8 @@ class Nav(Node):
         yaw_err = self.compute_yaw_error()
 
         if abs(linear_err) > self.desired_linear_err:
-            
             self.cmd_vel.linear.x = np.sign(linear_err)*self.linear_velocity
-            self.cmd_vel.angular.z = np.sign(yaw_err)*self.angular_velocity*yaw_err*0.05
+            self.cmd_vel.angular.z = np.sign(yaw_err)*self.angular_velocity*yaw_err*0.2
 
             self.cmd_vel_publisher.publish(self.cmd_vel)
             self.get_logger().info(f'linear error : {self.compute_linear_error()}')
@@ -178,6 +177,7 @@ class Nav(Node):
 
     def land(self):
         self.get_logger().info("Landing...")
+        self.land_publisher.publish(Empty())
         time.sleep(2)  # Simulate landing
     
         
