@@ -98,12 +98,6 @@ def generate_launch_description():
             description='If provided, sets the fixed frame in RViz.'
         ),
 
-        OpaqueFunction(
-            function=rviz_node_generator,
-            kwargs={'rviz_path': rviz_path},
-        ),
-
-
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(simulation_path, 'launch', 'sjtu_drone_gazebo.launch.py')
