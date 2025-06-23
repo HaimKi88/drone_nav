@@ -53,12 +53,12 @@ class Nav(Node):
     def _init_members(self):
         self.state = DroneState.IDLE
         self.cmd_vel = Twist()
-        self.linear_velocity = 1.5
+        self.linear_velocity = 2.5
         self.angular_velocity = 1.0
         self.yaw_p_ctrl = 0.5
         self.yaw_d_ctrl = 0.8
         self.last_yaw_err = 0
-        self.desired_yaw_err = np.deg2rad(1)
+        self.desired_yaw_err = np.deg2rad(2)
         self.desired_linear_err = 1.0
             
     def _init_subscribers(self):
@@ -94,7 +94,7 @@ class Nav(Node):
         _, _, heading = euler_from_quaternion(q_orientation)
         # self.get_logger().info(f'heading: {heading}, yaw: {yaw}')
 
-        return heading-yaw
+        return yaw-heading
     
     def compute_linear_error(self):
         """Compute Euclidean distance to the target."""
@@ -174,7 +174,7 @@ class Nav(Node):
         yaw_err = self.compute_yaw_error()
 
         if abs(yaw_err) > self.desired_yaw_err:
-            self.cmd_vel.angular.z = np.sign(yaw_err)*self.angular_velocity*yaw_err*self.yaw_p_ctrl
+            self.cmd_vel.angular.z = self.angular_velocity*yaw_err*self.yaw_p_ctrl
             self.cmd_vel_publisher.publish(self.cmd_vel)
             return False
         else:         
@@ -191,8 +191,8 @@ class Nav(Node):
         yaw_differential_control = (yaw_err - self.last_yaw_err)/((self.get_clock().now().nanoseconds - self.past_time)*1e-9) * self.yaw_d_ctrl
 
         if abs(linear_err) > self.desired_linear_err:
-            self.cmd_vel.linear.x = np.sign(linear_err)*self.linear_velocity
-            self.cmd_vel.angular.z = np.sign(yaw_err)*self.angular_velocity*yaw_differential_control
+            self.cmd_vel.linear.x = self.linear_velocity
+            self.cmd_vel.angular.z = self.angular_velocity*yaw_differential_control
 
             self.cmd_vel_publisher.publish(self.cmd_vel)
             self.get_logger().info(f'linear error : {self.compute_linear_error():.2f}')
