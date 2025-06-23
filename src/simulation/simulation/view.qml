@@ -34,7 +34,7 @@ Window {
         id: cute_map
         anchors.fill: parent
         plugin: mapPlugin
-        center: QtPositioning.coordinate(32.072734, 34.787465)
+        center: QtPositioning.coordinate(32.16199668246387, 34.94557142546426)
         zoomLevel: 17.0
         maximumZoomLevel: 17.9
         activeMapType: supportedMapTypes[0]
