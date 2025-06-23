@@ -2,14 +2,12 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix
 from geographic_msgs.msg import GeoPoint
-from geometry_msgs.msg import Twist, Vector3
+from geometry_msgs.msg import Twist
 from std_msgs.msg import Empty
 from nav_msgs.msg import Odometry
-import utm
 import time
 from enum import Enum, auto
 import numpy as np
-from geometry_msgs.msg import Quaternion
 from tf_transformations import euler_from_quaternion
 
 class DroneState(Enum):
@@ -19,6 +17,25 @@ class DroneState(Enum):
     MOVE_TO_POSITION = auto()
     LAND = auto()
     DONE = auto()
+
+def geo_to_xy(lat, lon, lat0, lon0):
+    # Earth radius in meters
+    R = 6378137.0
+
+    # Convert degrees to radians
+    lat_rad = np.deg2rad(lat)
+    lon_rad = np.deg2rad(lon)
+    lat0_rad = np.deg2rad(lat0)
+    lon0_rad = np.deg2rad(lon0)
+
+    # Equirectangular projection
+    dlat = lat_rad - lat0_rad
+    dlon = lon_rad - lon0_rad
+
+    x = R * dlon * np.cos(lat0_rad)
+    y = R * dlat
+
+    return x, y
 
 class Nav(Node):
     
@@ -74,18 +91,27 @@ class Nav(Node):
         dy = self.y_target - self.odom.pose.pose.position.y
 
         return np.hypot(dx,dy)
-    
+
     def get_target(self, msg):
+        self.get_logger().info(f'got a new target {msg}')
         self.target = msg
-        self.get_logger().info('got a new target')
-        self.x_target = -5.0
-        self.y_target = 2.0
-        self.z_target = 0.5
+        lat0 = 32.072734
+        lon0 = 34.787465
+        x, y = geo_to_xy(self.target.latitude, self.target.longitude, lat0, lon0)
+        self.x_target = x
+        self.y_target = y
+
+        self.state = DroneState.IDLE
         self._run_control_timer = self.create_timer(1/10.0, self.run_position_control)
 
     def run_position_control(self):
+        self.get_logger().info(
+            f"\nposition: [{self.odom.pose.pose.position.x:.2f}, {self.odom.pose.pose.position.y:.2f}, {self.odom.pose.pose.position.z:.2f}]\n"
+            f"linear velocity: [{self.odom.twist.twist.linear.x:.2f}, {self.odom.twist.twist.linear.y:.2f}, {self.odom.twist.twist.linear.z:.2f}]\n"
+            f"angular velocity: [{self.odom.twist.twist.angular.x:.2f}, {self.odom.twist.twist.angular.y:.2f}, {self.odom.twist.twist.angular.z:.2f}]")
+
         if self.state == DroneState.IDLE:
-            print("[STATE] IDLE")
+            self.get_logger().info("STATE IDLE")
             self.transition_to(DroneState.TAKEOFF)
 
         elif self.state == DroneState.TAKEOFF:
@@ -105,7 +131,7 @@ class Nav(Node):
             self.transition_to(DroneState.DONE)
         
         elif self.state == DroneState.DONE:
-            self._run_control_timer.cancel()
+            self._run_control_timer.destroy()
 
     def transition_to(self, new_state):
         self.get_logger().info(f"→ Transitioning to {new_state.name}")

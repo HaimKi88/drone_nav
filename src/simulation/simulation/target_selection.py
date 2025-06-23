@@ -61,7 +61,6 @@ class Backend(QObject):
         return self._target_location
 
     def cb_location(self, msg: NavSatFix):
-        # print(f"Received GPS: lat={msg.latitude}, lon={msg.longitude}", flush=True)
         self._robot_location = get_coord(msg.latitude, msg.longitude)
         self.locationChanged.emit()
 
