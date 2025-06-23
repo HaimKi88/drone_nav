@@ -35,8 +35,8 @@ class Backend(QObject):
         super().__init__(parent)
         self.node = ros_node
         self._should_run = True
-        self._robot_location = get_coord(32.16199668246387, 34.94557142546426)
-        self._target_location = get_coord(32.16199668246387, 34.94557142546426)
+        self._robot_location = get_coord(32.072734, 34.787465)
+        self._target_location = get_coord(32.072734, 34.787465)
         self._robot_route = []
         self.max_tractor_hist = 1000
 
