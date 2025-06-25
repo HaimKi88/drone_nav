@@ -53,13 +53,16 @@ class Nav(Node):
     def _init_members(self):
         self.state = DroneState.IDLE
         self.cmd_vel = Twist()
-        self.linear_velocity = 2.5
-        self.angular_velocity = 1.0
-        self.yaw_p_ctrl = 0.5
-        self.yaw_d_ctrl = 0.8
-        self.last_yaw_err = 0
-        self.desired_yaw_err = np.deg2rad(2)
-        self.desired_linear_err = 1.0
+
+        self.declare_parameter('linear_velocity', 2.5)
+        self.declare_parameter('angular_velocity', 1.0)
+        self.declare_parameter('yaw_p_ctrl', 0.5)
+        self.declare_parameter('yaw_d_ctrl', 3.0)
+        self.declare_parameter('last_yaw_err', 0)
+        self.declare_parameter('desired_yaw_err', np.deg2rad(2))
+        self.declare_parameter('desired_linear_err', 1.0)
+
+        self.last_yaw_err = 0.0 
             
     def _init_subscribers(self):
         self._coordinates_sub = self.create_subscription(NavSatFix, "/simple_drone/gps/nav", self.get_drone_coordinates, 10)
@@ -92,7 +95,6 @@ class Nav(Node):
         q_orientation = [self.odom.pose.pose.orientation.x, self.odom.pose.pose.orientation.y, 
                          self.odom.pose.pose.orientation.z, self.odom.pose.pose.orientation.w]
         _, _, heading = euler_from_quaternion(q_orientation)
-        # self.get_logger().info(f'heading: {heading}, yaw: {yaw}')
 
         return yaw-heading
     
@@ -127,8 +129,8 @@ class Nav(Node):
             self.get_logger().info(
                 f"\nPosition: [{pos.x:.2f}, {pos.y:.2f}, {pos.z:.2f}]\n"
                 f"Target: [{self.x_target:.2f}, {self.y_target:.2f}]\n"
-                f"Velocity (linear): [{twist.linear.x:.2f}, {twist.linear.y:.2f}, {twist.linear.z:.2f}]\n"
-                f"Velocity (angular): [{twist.angular.x:.2f}, {twist.angular.y:.2f}, {twist.angular.z:.2f}]\n"
+                f"linear Velocity: [{twist.linear.x:.2f}, {twist.linear.y:.2f}, {twist.linear.z:.2f}] [m/s]\n"
+                f"angular Velocity: [{twist.angular.x:.2f}, {twist.angular.y:.2f}, {twist.angular.z:.2f}] [rad/s]\n"
             )
         except AttributeError:
             self.get_logger().warn("Odometry data not yet received.")
@@ -171,10 +173,14 @@ class Nav(Node):
     def rotate(self):
         """Rotate drone to face target heading."""
         self.get_logger().info("Rotating in place...")
-        yaw_err = self.compute_yaw_error()
 
-        if abs(yaw_err) > self.desired_yaw_err:
-            self.cmd_vel.angular.z = self.angular_velocity*yaw_err*self.yaw_p_ctrl
+        yaw_err = self.compute_yaw_error()
+        p_ctrl = self.get_parameter('yaw_p_ctrl').value
+        angular_velocity = self.get_parameter('angular_velocity').value
+        desired_yaw_err = self.get_parameter('desired_yaw_err').value
+
+        if abs(yaw_err) > desired_yaw_err:
+            self.cmd_vel.angular.z = angular_velocity*yaw_err*p_ctrl
             self.cmd_vel_publisher.publish(self.cmd_vel)
             return False
         else:         
@@ -186,16 +192,23 @@ class Nav(Node):
     def move_to_position(self):
         """Move drone to target XY position."""
         self.get_logger().info("Moving to target position...")
+
+        linear_velocity = self.get_parameter('linear_velocity').value
+        angular_velocity = self.get_parameter('angular_velocity').value
+        desired_linear_err = self.get_parameter('desired_linear_err').value
+        yaw_d_ctrl = self.get_parameter('yaw_d_ctrl').value
+        
         linear_err = self.compute_linear_error()
         yaw_err = self.compute_yaw_error()
-        yaw_differential_control = (yaw_err - self.last_yaw_err)/((self.get_clock().now().nanoseconds - self.past_time)*1e-9) * self.yaw_d_ctrl
+        yaw_differential_control = (yaw_err - self.last_yaw_err)/((self.get_clock().now().nanoseconds - self.past_time)*1e-9) * yaw_d_ctrl
 
-        if abs(linear_err) > self.desired_linear_err:
-            self.cmd_vel.linear.x = self.linear_velocity
-            self.cmd_vel.angular.z = self.angular_velocity*yaw_differential_control
+        if abs(linear_err) > desired_linear_err:
+            self.cmd_vel.linear.x = linear_velocity
+            self.cmd_vel.angular.z = angular_velocity*yaw_differential_control
 
             self.cmd_vel_publisher.publish(self.cmd_vel)
-            self.get_logger().info(f'linear error : {self.compute_linear_error():.2f}')
+            self.get_logger().info(f'linear error : {self.compute_linear_error():.2f} [m]')
+            self.get_logger().info(f'heading error : {self.compute_yaw_error():.2f} [deg]')
             self.last_yaw_err = yaw_err
             self.past_time = self.get_clock().now().nanoseconds
 
@@ -203,7 +216,6 @@ class Nav(Node):
         else:         
             self.cmd_vel.linear.x = 0.0
             self.cmd_vel_publisher.publish(self.cmd_vel)
-            self.get_logger().info(f'linear error : {self.compute_linear_error():.2f}')
             return True
         
     def land(self):
