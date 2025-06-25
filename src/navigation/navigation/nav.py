@@ -178,6 +178,7 @@ class Nav(Node):
         p_ctrl = self.get_parameter('yaw_p_ctrl').value
         angular_velocity = self.get_parameter('angular_velocity').value
         desired_yaw_err = self.get_parameter('desired_yaw_err').value
+        self.cmd_vel.linear.x = 0.0
 
         if abs(yaw_err) > desired_yaw_err:
             self.cmd_vel.angular.z = angular_velocity*yaw_err*p_ctrl
